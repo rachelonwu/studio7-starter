@@ -3,8 +3,11 @@ export const dom = {
 	tasksList: document.querySelector("#tasks_list"),
 	taskTemplate: document.querySelector("#task_template"),
 	doneCount: document.querySelector("#done_count"),
-	totalCount: document.querySelector("#total_count")
+	totalCount: document.querySelector("#total_count"),
+	clearCompletedButton: document.querySelector("#clear_completed_button")
 };
+
+let draggedItem = null;
 
 // Initialize data. Do we have anything stored?
 if (localStorage.tasks) {
@@ -18,9 +21,9 @@ else {
 	addItem();
 }
 
+// Keyboard shortcuts on task title inputs
 dom.tasksList.addEventListener("keydown", e => {
 	if (!e.target.matches("input.title")) {
-		// We are only interested in key events on the text field
 		return;
 	}
 
@@ -31,9 +34,90 @@ dom.tasksList.addEventListener("keydown", e => {
 	}
 	else if (e.key === "Backspace" && e.target.value.length === 0 && !e.repeat) {
 		const previousSibling = li.previousElementSibling;
+		const nextSibling = li.nextElementSibling;
+
 		li.querySelector(".delete").click();
-		focusTask(previousSibling ?? dom.tasksList.firstElementChild);
+		focusTask(previousSibling ?? nextSibling ?? dom.tasksList.firstElementChild);
 		e.preventDefault(); // prevent data corruption
+	}
+	else if (e.key === "ArrowUp") {
+		focusTask(li.previousElementSibling);
+		e.preventDefault();
+	}
+	else if (e.key === "ArrowDown") {
+		focusTask(li.nextElementSibling);
+		e.preventDefault();
+	}
+});
+
+// Update done count when a checkbox changes
+dom.tasksList.addEventListener("change", e => {
+	if (e.target.matches(".done")) {
+		updateCounts();
+	}
+});
+
+// Delete button behavior
+dom.tasksList.addEventListener("click", e => {
+	if (!e.target.matches(".delete")) {
+		return;
+	}
+
+	const li = e.target.closest("li");
+	const previousSibling = li.previousElementSibling;
+	const nextSibling = li.nextElementSibling;
+
+	li.remove();
+	updateCounts();
+
+	focusTask(previousSibling ?? nextSibling ?? dom.tasksList.firstElementChild);
+
+	// Keep at least one task in the list
+	if (dom.tasksList.children.length === 0) {
+		addItem();
+	}
+});
+
+// Drag and drop
+dom.tasksList.addEventListener("dragstart", e => {
+	const li = e.target.closest("li");
+	if (!li) {
+		return;
+	}
+
+	draggedItem = li;
+	li.classList.add("dragging");
+
+	// Needed for some browsers
+	e.dataTransfer.effectAllowed = "move";
+	e.dataTransfer.setData("text/plain", "");
+});
+
+dom.tasksList.addEventListener("dragover", e => {
+	e.preventDefault();
+
+	const afterElement = getDragAfterElement(dom.tasksList, e.clientY);
+	if (!draggedItem) {
+		return;
+	}
+
+	if (afterElement === null) {
+		dom.tasksList.append(draggedItem);
+	}
+	else if (afterElement !== draggedItem) {
+		dom.tasksList.insertBefore(draggedItem, afterElement);
+	}
+});
+
+dom.tasksList.addEventListener("drop", e => {
+	e.preventDefault();
+});
+
+dom.tasksList.addEventListener("dragend", () => {
+	if (draggedItem) {
+		draggedItem.classList.remove("dragging");
+		focusTask(draggedItem);
+		draggedItem = null;
 	}
 });
 
@@ -64,13 +148,17 @@ export function addItem (data = { done: false, title: "" }) {
  * Delete all tasks that are marked as done
  */
 export function clearCompleted () {
-	// TODO implement this (see step 4)
+	const deleteButtons = dom.tasksList.querySelectorAll("li:has(.done:checked) .delete");
+
+	for (const button of deleteButtons) {
+		button.click();
+	}
 }
 
 /**
-* Focus the title field of the specified task
-* @param {Node} element Reference to DOM element of the task to focus (or any of its descendants)
-*/
+ * Focus the title field of the specified task
+ * @param {Node} element Reference to DOM element of the task to focus (or any of its descendants)
+ */
 export function focusTask (element) {
 	element?.closest("li")?.querySelector("input.title").focus();
 }
@@ -94,4 +182,24 @@ function updateTotalCount () {
 function updateCounts () {
 	updateDoneCount();
 	updateTotalCount();
+}
+
+function getDragAfterElement(container, y) {
+	const draggableElements = [...container.querySelectorAll("li:not(.dragging)")];
+
+	let closest = {
+		offset: Number.NEGATIVE_INFINITY,
+		element: null
+	};
+
+	for (const element of draggableElements) {
+		const box = element.getBoundingClientRect();
+		const offset = y - box.top - box.height / 2;
+
+		if (offset < 0 && offset > closest.offset) {
+			closest = { offset, element };
+		}
+	}
+
+	return closest.element;
 }

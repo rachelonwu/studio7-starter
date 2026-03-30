@@ -1,5 +1,6 @@
 * {
 	font-family: Helvetica Neue, Segoe UI, sans-serif;
+	box-sizing: border-box;
 }
 
 button, input {
@@ -11,6 +12,15 @@ ul {
 	padding: 0;
 }
 
+li {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 6px;
+	padding: 4px;
+	border-radius: 6px;
+}
+
 input[type="text"] {
 	width: 300px;
 }
@@ -19,4 +29,12 @@ input[type="text"] {
 	color: gray;
 	font-style: italic;
 	text-decoration: line-through;
+}
+
+li[draggable="true"] {
+	cursor: grab;
+}
+
+li.dragging {
+	opacity: 0.5;
 }
